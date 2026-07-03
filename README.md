@@ -1,7 +1,8 @@
 # AIGTM
 
 Internal AI-assisted GTM / lead generation tool for Cloudculate.
-Integrates with Gmail, HubSpot, and Slack. See
+Integrates with Gmail and Slack (HubSpot is temporarily paused pending a
+plan upgrade — see `docs/SCOPE.md`). See
 [`docs/SCOPE.md`](docs/SCOPE.md) for the feature roadmap and
 [`docs/SECURITY.md`](docs/SECURITY.md) for the security model — read
 that one before deploying anywhere.

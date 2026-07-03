@@ -1,9 +1,10 @@
 # AIGTM — Security Model
 
-This tool holds OAuth access to your Gmail, HubSpot, and Slack accounts.
-Everything below exists to keep that access from becoming a liability —
-both against outside attackers and against AIGTM's own AI steps making a
-bad autonomous call.
+This tool holds OAuth access to your Gmail and Slack accounts (HubSpot
+is temporarily paused — see `docs/SCOPE.md`). Everything below exists to
+keep that access from becoming a liability — both against outside
+attackers and against AIGTM's own AI steps making a bad autonomous call.
+The model applies equally once HubSpot is reinstated.
 
 ## Credential storage
 
@@ -48,26 +49,28 @@ their inbox instead of yours.
   single-use, server-stored, 10-minute-lived state row
   (`OAuthState`). It's deleted the moment it's consumed — a replayed
   callback URL can never succeed twice.
-- **PKCE** on the Gmail flow (Google supports it; HubSpot/Slack's
-  server-side confidential-client flows don't need it).
+- **PKCE** on the Gmail flow (Google supports it; Slack's server-side
+  confidential-client flow doesn't need it; HubSpot's would follow the
+  same pattern once reinstated).
 - **Least-privilege scopes**, requested explicitly per provider and
   documented at the request site:
   - Gmail: `gmail.compose` + `gmail.metadata` only — never
     `gmail.readonly` or `gmail.modify`. AIGTM can draft and detect
     replies; it cannot read your inbox contents or send unsupervised.
-  - HubSpot: contacts + companies read/write only. Deal-write scope is
-    deferred until Phase 2 actually needs it — don't request access you
-    don't use yet.
   - Slack: `chat:write` + `chat:write.public` only — no channel history
     read, no user email read.
+  - HubSpot *(paused)*: was scoped to contacts + companies read/write
+    only, with deal-write deferred to Phase 2 — keep that same
+    least-privilege posture when it's reinstated.
 
 ## Webhooks
 
-- Slack events and HubSpot webhooks are verified against their
-  documented HMAC signature schemes
-  (`src/middleware/verifyWebhookSignature.ts`) using a raw-body capture
-  so the signature is checked over the exact bytes the provider sent,
-  not a re-serialized JSON.parse output.
+- Slack events are verified against Slack's documented HMAC signature
+  scheme (`src/middleware/verifyWebhookSignature.ts`) using a raw-body
+  capture so the signature is checked over the exact bytes Slack sent,
+  not a re-serialized JSON.parse output. The equivalent HubSpot verifier
+  was removed with the rest of the HubSpot integration — it's in git
+  history to restore alongside the webhook route.
 - Both verifiers reject requests with a timestamp more than 5 minutes
   old, so a captured request can't be replayed indefinitely.
 - All signature/HMAC comparisons use `timingSafeEqual`, never `===`.
@@ -103,9 +106,9 @@ their inbox instead of yours.
 
 ## If a credential is compromised
 
-1. Revoke the token at the provider (Google/HubSpot/Slack app
-   dashboard) immediately — this invalidates it even if AIGTM's copy is
-   still encrypted at rest.
+1. Revoke the token at the provider (Google/Slack app dashboard, or
+   HubSpot once reinstated) immediately — this invalidates it even if
+   AIGTM's copy is still encrypted at rest.
 2. Rotate `TOKEN_ENCRYPTION_KEY`, `SESSION_SECRET`, and
    `ADMIN_API_TOKEN`.
 3. Re-run the OAuth connect flow for the affected provider.

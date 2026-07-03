@@ -49,9 +49,8 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1),
 
-  HUBSPOT_OAUTH_CLIENT_ID: z.string().min(1),
-  HUBSPOT_OAUTH_CLIENT_SECRET: z.string().min(1),
-  HUBSPOT_WEBHOOK_SIGNING_SECRET: z.string().min(1),
+  // HubSpot integration is temporarily disabled (see docs/SCOPE.md) —
+  // no HubSpot env vars are required to boot the app right now.
 
   SLACK_CLIENT_ID: z.string().min(1),
   SLACK_CLIENT_SECRET: z.string().min(1),

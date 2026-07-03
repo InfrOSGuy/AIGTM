@@ -6,10 +6,8 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { loadEnv } from "./config/env.js";
 import { registerRawBodyCapture } from "./lib/rawBodyPlugin.js";
 import { registerGmailAuthRoutes } from "./routes/auth/gmail.js";
-import { registerHubspotAuthRoutes } from "./routes/auth/hubspot.js";
 import { registerLoginRoutes } from "./routes/auth/login.js";
 import { registerSlackAuthRoutes } from "./routes/auth/slack.js";
-import { registerHubspotWebhookRoutes } from "./routes/webhooks/hubspot.js";
 import { registerSlackWebhookRoutes } from "./routes/webhooks/slack.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -36,12 +34,14 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   app.get("/health", async () => ({ ok: true }));
 
+  // HubSpot integration is temporarily disabled — it requires a HubSpot
+  // plan tier we don't currently have. See docs/SCOPE.md. Re-add
+  // registerHubspotAuthRoutes / registerHubspotWebhookRoutes (git history
+  // has the implementation) once that's resolved.
   registerLoginRoutes(app);
   registerGmailAuthRoutes(app);
-  registerHubspotAuthRoutes(app);
   registerSlackAuthRoutes(app);
   registerSlackWebhookRoutes(app);
-  registerHubspotWebhookRoutes(app);
 
   return app;
 }

@@ -44,38 +44,8 @@ export async function verifySlackSignature(
   }
 }
 
-/**
- * Verifies HubSpot's v3 webhook signature per
- * https://developers.hubspot.com/docs/api/webhooks/validating-requests
- */
-export async function verifyHubspotSignature(
-  request: FastifyRequest,
-  reply: FastifyReply,
-): Promise<void> {
-  const env = loadEnv();
-  const timestamp = request.headers["x-hubspot-request-timestamp"];
-  const signature = request.headers["x-hubspot-signature-v3"];
-
-  if (typeof timestamp !== "string" || typeof signature !== "string" || !request.rawBody) {
-    reply.code(401).send({ error: "missing signature headers" });
-    return reply;
-  }
-
-  const age = Math.abs(Date.now() - Number(timestamp));
-  if (!Number.isFinite(age) || age > MAX_CLOCK_SKEW_SECONDS * 1000) {
-    reply.code(401).send({ error: "stale request timestamp" });
-    return reply;
-  }
-
-  const method = request.method.toUpperCase();
-  const url = `${env.APP_BASE_URL}${request.url}`;
-  const base = `${method}${url}${request.rawBody}${timestamp}`;
-  const expected = createHmac("sha256", env.HUBSPOT_WEBHOOK_SIGNING_SECRET)
-    .update(base)
-    .digest("base64");
-
-  if (!timingSafeStringEqual(expected, signature)) {
-    reply.code(401).send({ error: "invalid signature" });
-    return reply;
-  }
-}
+// verifyHubspotSignature (HubSpot v3 webhook signature) was removed
+// along with the rest of the HubSpot integration — see docs/SCOPE.md.
+// It's in git history (same commit that removed routes/webhooks/hubspot.ts)
+// and can be restored verbatim once HUBSPOT_WEBHOOK_SIGNING_SECRET is
+// back in the env schema.

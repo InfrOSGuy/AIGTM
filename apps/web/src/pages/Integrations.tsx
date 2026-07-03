@@ -1,8 +1,9 @@
 import { startIntegrationConnect } from "../lib/api";
 
+// HubSpot is temporarily disabled (plan upgrade needed) — see
+// docs/SCOPE.md. Add it back to this list once that's resolved.
 const PROVIDERS = [
   { id: "gmail", label: "Gmail", description: "Draft AI-personalized outreach emails" },
-  { id: "hubspot", label: "HubSpot", description: "Sync leads, companies, and scores" },
   { id: "slack", label: "Slack", description: "Alert on qualified leads and replies" },
 ] as const;
 
