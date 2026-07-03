@@ -1,0 +1,158 @@
+// AIGTM data model.
+//
+// Security note: IntegrationConnection never stores plaintext OAuth
+// tokens. accessTokenEnc/refreshTokenEnc are opaque strings produced by
+// src/crypto/tokenCipher.ts (AES-256-GCM). Application code must always
+// go through that module — never write raw token bytes to these columns.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum IntegrationProvider {
+  gmail
+  hubspot
+  slack
+}
+
+enum LeadStage {
+  new
+  enriching
+  scored
+  qualified
+  disqualified
+  outreach_drafted
+  outreach_sent
+  replied
+}
+
+enum OutreachStatus {
+  drafted
+  approved
+  sent
+  rejected
+}
+
+model Company {
+  id                String   @id @default(cuid())
+  domain            String   @unique
+  name              String
+  industry          String?
+  employeeCount     Int?
+  hubspotCompanyId  String?  @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  leads Lead[]
+}
+
+model Lead {
+  id                String    @id @default(cuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id])
+  email             String    @unique
+  firstName         String?
+  lastName          String?
+  title             String?
+  source            String
+  stage             LeadStage @default(new)
+  hubspotContactId  String?   @unique
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  scores          LeadScore[]
+  outreachDrafts  OutreachDraft[]
+
+  @@index([stage])
+}
+
+model IcpDefinition {
+  id           String   @id @default(cuid())
+  name         String
+  rulesJson    Json
+  dealBreakersJson Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  scores LeadScore[]
+}
+
+model LeadScore {
+  id              String   @id @default(cuid())
+  leadId          String
+  lead            Lead     @relation(fields: [leadId], references: [id])
+  icpDefinitionId String
+  icpDefinition   IcpDefinition @relation(fields: [icpDefinitionId], references: [id])
+  fitScore        Int
+  intentScore     Int
+  rationale       String
+  createdAt       DateTime @default(now())
+
+  @@index([leadId])
+}
+
+// One row per connected provider. Single-tenant, so no orgId — if this
+// ever becomes multi-tenant, add an orgId + unique(orgId, provider).
+model IntegrationConnection {
+  id                String              @id @default(cuid())
+  provider          IntegrationProvider @unique
+  accessTokenEnc    String
+  refreshTokenEnc   String?
+  scopes            String[]
+  expiresAt         DateTime?
+  connectedAt       DateTime            @default(now())
+  lastRefreshedAt   DateTime?
+  revokedAt         DateTime?
+}
+
+// Short-lived, single-use CSRF state for the OAuth authorization-code
+// flow. Rows are deleted on use; a background sweep can purge expired
+// rows. Prevents authorization-code injection / login CSRF.
+model OAuthState {
+  id         String              @id @default(cuid())
+  state      String              @unique
+  provider   IntegrationProvider
+  codeVerifier String?           // PKCE verifier, when the provider supports PKCE
+  createdAt  DateTime            @default(now())
+  expiresAt  DateTime
+}
+
+// Outreach is always drafted first; a human must explicitly approve
+// before AIGTM is allowed to send anything through Gmail.
+model OutreachDraft {
+  id              String         @id @default(cuid())
+  leadId          String
+  lead            Lead           @relation(fields: [leadId], references: [id])
+  subject         String
+  bodyText        String
+  gmailDraftId    String?
+  status          OutreachStatus @default(drafted)
+  approvedBy      String?
+  approvedAt      DateTime?
+  sentAt          DateTime?
+  createdAt       DateTime       @default(now())
+
+  @@index([leadId])
+  @@index([status])
+}
+
+// Append-only trail for sensitive actions: integration connect/disconnect,
+// outreach approval/send, ICP rule changes. Never update or delete rows
+// from application code.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actor      String
+  action     String
+  targetType String
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}

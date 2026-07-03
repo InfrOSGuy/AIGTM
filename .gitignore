@@ -1,0 +1,31 @@
+node_modules/
+dist/
+build/
+coverage/
+
+# Secrets — never commit real env files. Only .env.example is tracked.
+.env
+.env.*
+!.env.example
+
+# Local dev DB
+*.sqlite
+*.sqlite3
+apps/api/prisma/dev.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Prisma generated client (regenerated on install)
+apps/api/src/generated/
+
+# Local key material, if ever dropped on disk by mistake
+*.pem
+*.key
