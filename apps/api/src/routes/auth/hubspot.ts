@@ -48,7 +48,9 @@ export function registerHubspotAuthRoutes(app: FastifyInstance): void {
       return reply.code(401).send({ error: "invalid or expired OAuth state" });
     }
 
-    const tokenRes = await fetch("https://api.hubapi.com/oauth/v1/token", {
+    // v1 still works but is deprecated (sunset Feb 2027); new apps should
+    // use the date-versioned endpoint per HubSpot's OAuth v3 migration.
+    const tokenRes = await fetch("https://api.hubapi.com/oauth/2026-03/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
