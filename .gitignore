@@ -2,6 +2,7 @@ node_modules/
 dist/
 build/
 coverage/
+*.tsbuildinfo
 
 # Secrets — never commit real env files. Only .env.example is tracked.
 .env
