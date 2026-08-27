@@ -10,7 +10,8 @@ that one before deploying anywhere.
 ## Structure
 
 ```
-apps/api    Fastify + TypeScript backend (OAuth, webhooks, scoring, sync)
+apps/api    Fastify + TypeScript backend (OAuth, webhooks, scoring, sync,
+            filing scanner — see src/filingScanner and src/integrations)
 apps/web    Vite + React admin dashboard
 packages/shared  Types shared between api and web
 ```

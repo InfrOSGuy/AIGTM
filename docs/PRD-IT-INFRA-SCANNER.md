@@ -92,7 +92,7 @@ existing pipeline rather than reimplementing equivalent functionality:
   applies here exactly as it does to Gmail.
 - **Syft** (syftdata.com) — two distinct uses, neither related to
   filings: (1) **website visitor de-anonymization** — identifies which
-  companies are visiting cloudculate.io, so a filing-flagged company
+  companies are visiting infros.io, so a filing-flagged company
   that then visits our site gets a corroborating "active interest"
   signal; this is the same capability AIGTM's `SCOPE.md` already lists
   as a Phase 3 goal, pulled forward because Syft covers it off the
@@ -178,7 +178,7 @@ outreach.
    Infrastructure/IT Director — and their current title/tenure via
    **LinkedIn / Sales Navigator** where Apollo's contact data is stale
    or missing. Also check **Syft** website-visitor de-anonymization for
-   a match: if this company has visited cloudculate.io recently, boost
+   a match: if this company has visited infros.io recently, boost
    the score — a filing/LinkedIn signal plus an inbound site visit is a
    stronger combined signal than either alone.
 6. **Sync** — write the candidate into **HubSpot** as a company/contact

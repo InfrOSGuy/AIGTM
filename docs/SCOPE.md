@@ -46,15 +46,28 @@ end state; HubSpot-dependent items are marked accordingly.
 - Website visitor de-anonymization (tracking pixel + identity
   resolution provider).
 
-## New source under scoping: IT infrastructure filing scanner
+## New source: IT infrastructure filing scanner
 
 Reddit-based signal sourcing is being retired (unreliable attribution,
 fragile to API/ToS changes). See
-[`PRD-IT-INFRA-SCANNER.md`](PRD-IT-INFRA-SCANNER.md) for the proposed
-replacement: a scanner over SEC filings (10-K/10-Q/8-K) that surfaces
-companies actively starting or managing IT infrastructure projects. It
-plugs into this same pipeline as a new source (`filing-scan`) — no new
-scoring, sync, or outreach mechanism required.
+[`PRD-IT-INFRA-SCANNER.md`](PRD-IT-INFRA-SCANNER.md) for the full
+design: a scanner over SEC EDGAR filings (10-K/10-Q/8-K) that surfaces
+companies actively starting or managing IT infrastructure projects,
+plus a Syft-driven website-visit corroborating signal.
+
+Initial implementation is in `apps/api/src/filingScanner/` (EDGAR
+client, section-aware parser, LLM signal extraction against the PRD §6
+taxonomy, scoring) and `apps/api/src/integrations/` (Apollo enrichment,
+Knock-ai alerting, a manual-only LinkedIn seam, and a not-yet-wired
+Syft client — see that file's doc comment for why). `POST
+/filing-scanner/scan` (admin-only) runs a scan; `GET
+/filing-scanner/signals` and `POST
+/filing-scanner/signals/:id/review` support the manual precision-review
+loop from the PRD. It deliberately does **not** create a `Lead` —
+`Lead.email` is required and this pipeline only resolves companies, not
+contacts (LinkedIn/Sales Navigator verification stays a manual human
+step); creating a Lead from a reviewed signal is a follow-up once
+contact resolution exists.
 
 ## Explicit non-goals for now
 
