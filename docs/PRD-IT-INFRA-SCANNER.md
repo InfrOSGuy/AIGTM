@@ -49,15 +49,22 @@ filings).
   only extracts IT-infrastructure-relevant signal, not full filing
   summarization.
 - Not scraping paywalled, subscription, or ToS-restricted report
-  sources. v1 covers only what's legally public (SEC EDGAR; investor
-  relations pages a company itself publishes).
+  sources ourselves. v1 covers only what's legally public (SEC EDGAR;
+  investor relations pages a company itself publishes) or what's
+  supplied through a vendor (Syft) whose own terms with LinkedIn govern
+  the post-monitoring feed in §5 — verify Syft's method is
+  ToS-compliant before depending on it as a primary source; this is the
+  same fragility that retired the Reddit channel, and we should not
+  rebuild it one layer removed.
 - Not covering private companies with no public disclosure obligation
   in v1 (see Phase 3).
 - Not auto-sending outreach — output is a scored candidate that enters
   the same human-in-the-loop enrichment/draft flow AIGTM already has.
-- Not real-time — quarterly/annual filings are an inherently lagging
-  indicator; that trade-off is accepted in exchange for reliability and
-  legitimacy of source.
+- The filing source is not real-time — quarterly/annual filings are an
+  inherently lagging indicator; that trade-off is accepted for that
+  source in exchange for reliability and legitimacy. (Syft's LinkedIn
+  post feed is faster-cadence by design — see §7 — but is secondary,
+  corroborating signal, not the primary source of record.)
 
 ## 4. Users
 
@@ -83,13 +90,21 @@ existing pipeline rather than reimplementing equivalent functionality:
   their title/tenure. Research use only — no auto-connect requests, no
   auto-InMail. AIGTM's no-unsupervised-send policy (`docs/SECURITY.md`)
   applies here exactly as it does to Gmail.
-- **Syft** — supplementary structured filings/financial-data source.
-  Where Syft has already parsed a filing into structured financial
-  statements, prefer its structured output over re-parsing raw EDGAR
-  HTML/XBRL for that filing; fall back to direct EDGAR parsing where
-  Syft doesn't cover a given filer. SEC EDGAR stays the source of
-  record for "did this filing exist and what does it say" — Syft is a
-  parsing accelerator, not a replacement data source.
+- **Syft** (syftdata.com) — two distinct uses, neither related to
+  filings: (1) **website visitor de-anonymization** — identifies which
+  companies are visiting cloudculate.io, so a filing-flagged company
+  that then visits our site gets a corroborating "active interest"
+  signal; this is the same capability AIGTM's `SCOPE.md` already lists
+  as a Phase 3 goal, pulled forward because Syft covers it off the
+  shelf rather than needing a bespoke tracking-pixel + identity
+  resolution build. (2) **LinkedIn post monitoring** — a second,
+  faster-cadence signal *source* alongside filings: tracks posts from
+  target companies and their execs for the same taxonomy in §6 (e.g. a
+  CIO announcing a cloud migration, a company posting about an ERP
+  rollout), surfaced independently of the quarterly/annual filing
+  cadence. See the ToS caveat in §3 — this is exactly the kind of
+  dependency that made the Reddit source fragile, so it needs the same
+  scrutiny before being relied on.
 - **Knock-ai** — notification/alerting layer. Replaces a bespoke
   Slack-webhook alert with a proper notification service: one
   qualified-hit event fans out to Slack (and later email or other
@@ -128,44 +143,52 @@ named are treated as **weak** signal and scored lower, not discarded —
 useful for building a "getting warmer" watchlist without triggering
 outreach.
 
-## 7. Pipeline (v1 scope: US SEC filers)
+## 7. Pipeline (v1 scope: US SEC filers, + Syft as a parallel source)
 
-1. **Ingest** — SEC EDGAR full-text search API + filing index for
-   10-K, 10-Q, and 8-K (Item 2.01 acquisitions / Item 1.01 material
-   agreements often carry IT vendor contracts). Poll daily against
-   EDGAR's "filings since" feed; no scraping of non-public sources.
-   Where **Syft** already has a filer's statements structured, pull
-   from there instead of re-parsing EDGAR's raw HTML/XBRL for that
-   filing.
-2. **Parse** — extract plain text from the filing; chunk by section
-   (MD&A, Risk Factors, Business Overview are highest-yield sections —
-   skip financial statement tables).
-3. **Extract** — LLM pass over each chunk classifies against the
+1. **Ingest** — two parallel feeds into the same Extract step:
+   - SEC EDGAR full-text search API + filing index for 10-K, 10-Q, and
+     8-K (Item 2.01 acquisitions / Item 1.01 material agreements often
+     carry IT vendor contracts). Poll daily against EDGAR's "filings
+     since" feed; no scraping of non-public sources. This is the
+     primary, source-of-record feed.
+   - **Syft** LinkedIn post monitoring for target companies/execs —
+     a secondary, faster-cadence feed against the same §6 taxonomy
+     (subject to the ToS caveat in §3).
+2. **Parse** — filings: extract plain text, chunk by section (MD&A,
+   Risk Factors, Business Overview are highest-yield — skip financial
+   statement tables). LinkedIn posts from Syft need no chunking, just
+   pass the post text straight to Extract.
+3. **Extract** — LLM pass classifies each chunk/post against the
    signal taxonomy in §6, extracting: signal type, quoted passage,
    confidence, and any named system/vendor/budget/timeline mentioned.
    This is the same "untrusted content → structured extraction, no
    autonomous action" pattern AIGTM already uses for enrichment (see
-   `docs/SECURITY.md`'s prompt-injection note) — filing text is
+   `docs/SECURITY.md`'s prompt-injection note). Filing text is
    adversarial-content-safe by construction (SEC-filed, attributable,
-   legally liable statements) but the extraction step still only
+   legally liable statements); LinkedIn post text is not, so treat it
+   like any other untrusted enrichment input — extraction only ever
    produces structured data, never a direct action.
-4. **Score** — combine signal strength, recency, and company
-   firmographic fit (size, industry) into a single score, reusing
-   AIGTM's existing ICP rules engine rather than building a second
-   scoring system.
-5. **Enrich** — resolve the filer to a company record via **Apollo**
+4. **Score** — combine signal strength, recency, source (filing vs.
+   Syft/LinkedIn), and company firmographic fit (size, industry) into
+   a single score, reusing AIGTM's existing ICP rules engine rather
+   than building a second scoring system.
+5. **Enrich** — resolve the filer/company to a record via **Apollo**
    (ticker/CIK/company name → domain, firmographic data, contact
    waterfall), then confirm the right contact — CIO/VP
    Infrastructure/IT Director — and their current title/tenure via
    **LinkedIn / Sales Navigator** where Apollo's contact data is stale
-   or missing.
+   or missing. Also check **Syft** website-visitor de-anonymization for
+   a match: if this company has visited cloudculate.io recently, boost
+   the score — a filing/LinkedIn signal plus an inbound site visit is a
+   stronger combined signal than either alone.
 6. **Sync** — write the candidate into **HubSpot** as a company/contact
-   record tagged with source = `filing-scan`, alongside the existing
-   lead pipeline, exactly like any other AIGTM source.
+   record tagged with source = `filing-scan` or `linkedin-post-scan`,
+   alongside the existing lead pipeline, exactly like any other AIGTM
+   source.
 7. **Alert** — fire a qualified-hit notification through **Knock-ai**
    (fanning out to Slack today, other channels later) with the quoted
-   filing passage and a link to the source document, so a human can
-   verify the signal before any outreach draft is created.
+   passage, its source, and a link to the source document/post, so a
+   human can verify the signal before any outreach draft is created.
 
 No new outreach or scoring UI is required — this is purely a new
 producer into the existing consumer pipeline, which is why it belongs
@@ -173,12 +196,15 @@ in AIGTM rather than as a standalone tool.
 
 ## 8. Phases
 
-**Phase 1 (MVP)** — US SEC EDGAR only (10-K/10-Q/8-K), full-text-search
-indexed filers (thousands of companies, updated daily by EDGAR itself).
-Rules+LLM extraction against the §6 taxonomy. Feeds existing pipeline.
-Manual precision review loop: GTM user marks each surfaced hit
-relevant/not in the dashboard, feeding back into extraction-prompt and
-scoring tuning.
+**Phase 1 (MVP)** — US SEC EDGAR (10-K/10-Q/8-K, full-text-search
+indexed filers) as the primary source, plus Syft's LinkedIn post
+monitoring and website-visitor de-anonymization as the secondary
+source and score-boost respectively (§7) — both are "integrate an
+existing vendor API" work, not new scraping/parsing infrastructure, so
+including them in v1 is low incremental cost. Rules+LLM extraction
+against the §6 taxonomy. Feeds existing pipeline. Manual precision
+review loop: GTM user marks each surfaced hit relevant/not in the
+dashboard, feeding back into extraction-prompt and scoring tuning.
 
 **Phase 2** — Add earnings call transcripts and investor
 presentations (where a company publishes them on its own IR site) as a
@@ -206,6 +232,10 @@ scraping is not prohibited by the publishing site's terms.
 
 ## 10. Open questions for the GTM user before build starts
 
+- Confirm how Syft sources LinkedIn post data (its own compliant
+  method vs. something that could draw the same ToS/API-stability risk
+  that retired the Reddit source) before treating it as a dependable
+  Phase 1 feed rather than a best-effort supplement.
 - Target industries/company-size band for the Phase 1 pilot (affects
   EDGAR filer volume and expected hit rate).
 - Whether 8-K M&A items should be in Phase 1 or held for Phase 2 —
