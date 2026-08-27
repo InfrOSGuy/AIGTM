@@ -8,6 +8,7 @@ import { registerRawBodyCapture } from "./lib/rawBodyPlugin.js";
 import { registerGmailAuthRoutes } from "./routes/auth/gmail.js";
 import { registerLoginRoutes } from "./routes/auth/login.js";
 import { registerSlackAuthRoutes } from "./routes/auth/slack.js";
+import { registerFilingScannerRoutes } from "./routes/filingScanner.js";
 import { registerSlackWebhookRoutes } from "./routes/webhooks/slack.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -42,6 +43,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   registerGmailAuthRoutes(app);
   registerSlackAuthRoutes(app);
   registerSlackWebhookRoutes(app);
+  registerFilingScannerRoutes(app);
 
   return app;
 }

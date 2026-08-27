@@ -55,6 +55,24 @@ const envSchema = z.object({
   SLACK_CLIENT_ID: z.string().min(1),
   SLACK_CLIENT_SECRET: z.string().min(1),
   SLACK_SIGNING_SECRET: z.string().min(1),
+
+  // Filing scanner (docs/PRD-IT-INFRA-SCANNER.md) — a new lead source,
+  // not required for the rest of the app to boot. Left optional so an
+  // existing deployment doesn't need new secrets just to keep running;
+  // routes/filingScanner.ts returns 503 rather than crashing the app
+  // when these are missing at request time.
+  //
+  // SEC requires a descriptive User-Agent identifying the requester —
+  // see https://www.sec.gov/os/webmaster-faq#developers.
+  SEC_EDGAR_USER_AGENT: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  // Enrichment/alerting are each independently optional — the scan
+  // still runs and persists signals without them, just without
+  // company resolution / notifications respectively.
+  APOLLO_API_KEY: z.string().optional(),
+  KNOCK_API_KEY: z.string().optional(),
+  KNOCK_WORKFLOW_KEY: z.string().optional(),
+  KNOCK_RECIPIENT_IDS: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
