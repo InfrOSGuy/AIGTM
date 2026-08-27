@@ -37,10 +37,11 @@ top-of-funnel source.
 **Primary metric:** qualified leads/month handed to the existing
 scoring+outreach pipeline, at a precision Cloudculate's GTM team judges
 acceptable during manual review (target ≥60% of surfaced hits judged
-"relevant" in Phase 1 review — see §8).
+"relevant" in Phase 1 review — see §9).
 
-**Secondary metric:** time from filing publication to lead surfaced in
-Slack (§7 target: same day for EDGAR full-text-search-indexed filings).
+**Secondary metric:** time from filing publication to lead surfaced via
+Knock-ai (§8 target: same day for EDGAR full-text-search-indexed
+filings).
 
 ## 3. Non-goals (v1)
 
@@ -63,7 +64,43 @@ Slack (§7 target: same day for EDGAR full-text-search-indexed filings).
 Internal only: Cloudculate's GTM/BD user(s), the same single-admin
 audience as the rest of AIGTM. No external or multi-tenant use.
 
-## 5. What counts as a signal
+## 5. Assumed integrations
+
+This PRD assumes the following are available and slots each into the
+existing pipeline rather than reimplementing equivalent functionality:
+
+- **HubSpot** — CRM sync target for candidates surfaced by this source.
+  (`docs/SCOPE.md` currently lists HubSpot as paused pending a plan
+  upgrade; this PRD assumes it's reinstated by build time. If it isn't,
+  ship with Sync deferred rather than blocking the rest of the
+  pipeline.)
+- **Apollo** — primary enrichment provider: resolves a filer
+  (ticker/CIK/company name) to firmographic data and a contact
+  waterfall (domain, employee count, industry, named contacts).
+- **LinkedIn + LinkedIn Sales Navigator** — decision-maker
+  identification and verification only: confirm the current
+  CIO/CTO/VP Infrastructure/IT Director for a flagged company, and
+  their title/tenure. Research use only — no auto-connect requests, no
+  auto-InMail. AIGTM's no-unsupervised-send policy (`docs/SECURITY.md`)
+  applies here exactly as it does to Gmail.
+- **Syft** — supplementary structured filings/financial-data source.
+  Where Syft has already parsed a filing into structured financial
+  statements, prefer its structured output over re-parsing raw EDGAR
+  HTML/XBRL for that filing; fall back to direct EDGAR parsing where
+  Syft doesn't cover a given filer. SEC EDGAR stays the source of
+  record for "did this filing exist and what does it say" — Syft is a
+  parsing accelerator, not a replacement data source.
+- **Knock-ai** — notification/alerting layer. Replaces a bespoke
+  Slack-webhook alert with a proper notification service: one
+  qualified-hit event fans out to Slack (and later email or other
+  channels, if wanted) with per-user preferences and delivery tracking,
+  instead of AIGTM hand-rolling multi-channel alerting.
+
+None of these change the human-in-the-loop principle in §3/§9: every
+integration above is read (enrich/research) or notify — none is a
+channel for autonomous outreach.
+
+## 6. What counts as a signal
 
 A passage qualifies if it describes the company **itself** doing one of:
 
@@ -91,18 +128,20 @@ named are treated as **weak** signal and scored lower, not discarded —
 useful for building a "getting warmer" watchlist without triggering
 outreach.
 
-## 6. Pipeline (v1 scope: US SEC filers)
+## 7. Pipeline (v1 scope: US SEC filers)
 
 1. **Ingest** — SEC EDGAR full-text search API + filing index for
    10-K, 10-Q, and 8-K (Item 2.01 acquisitions / Item 1.01 material
    agreements often carry IT vendor contracts). Poll daily against
    EDGAR's "filings since" feed; no scraping of non-public sources.
-2. **Parse** — extract plain text from the filing (EDGAR provides
-   structured HTML/XBRL); chunk by section (MD&A, Risk Factors,
-   Business Overview are highest-yield sections — skip financial
-   statement tables).
+   Where **Syft** already has a filer's statements structured, pull
+   from there instead of re-parsing EDGAR's raw HTML/XBRL for that
+   filing.
+2. **Parse** — extract plain text from the filing; chunk by section
+   (MD&A, Risk Factors, Business Overview are highest-yield sections —
+   skip financial statement tables).
 3. **Extract** — LLM pass over each chunk classifies against the
-   signal taxonomy in §5, extracting: signal type, quoted passage,
+   signal taxonomy in §6, extracting: signal type, quoted passage,
    confidence, and any named system/vendor/budget/timeline mentioned.
    This is the same "untrusted content → structured extraction, no
    autonomous action" pattern AIGTM already uses for enrichment (see
@@ -114,26 +153,29 @@ outreach.
    firmographic fit (size, industry) into a single score, reusing
    AIGTM's existing ICP rules engine rather than building a second
    scoring system.
-5. **Enrich** — resolve the filer to a company record via the existing
-   enrichment waterfall (ticker/CIK → domain → firmographic +
-   contact data), and identify the right contact (CIO/VP
-   Infrastructure/IT Director where disclosed, otherwise falls back to
-   AIGTM's existing contact-resolution logic).
-6. **Sync/Alert** — write the candidate into the same lead pipeline as
-   any other source (source = `filing-scan`), Slack-alert on
-   high-confidence hits exactly like existing qualified-lead alerts,
-   with the quoted filing passage and a link to the source document so
-   a human can verify the signal before any outreach draft is created.
+5. **Enrich** — resolve the filer to a company record via **Apollo**
+   (ticker/CIK/company name → domain, firmographic data, contact
+   waterfall), then confirm the right contact — CIO/VP
+   Infrastructure/IT Director — and their current title/tenure via
+   **LinkedIn / Sales Navigator** where Apollo's contact data is stale
+   or missing.
+6. **Sync** — write the candidate into **HubSpot** as a company/contact
+   record tagged with source = `filing-scan`, alongside the existing
+   lead pipeline, exactly like any other AIGTM source.
+7. **Alert** — fire a qualified-hit notification through **Knock-ai**
+   (fanning out to Slack today, other channels later) with the quoted
+   filing passage and a link to the source document, so a human can
+   verify the signal before any outreach draft is created.
 
 No new outreach or scoring UI is required — this is purely a new
 producer into the existing consumer pipeline, which is why it belongs
 in AIGTM rather than as a standalone tool.
 
-## 7. Phases
+## 8. Phases
 
 **Phase 1 (MVP)** — US SEC EDGAR only (10-K/10-Q/8-K), full-text-search
 indexed filers (thousands of companies, updated daily by EDGAR itself).
-Rules+LLM extraction against the §5 taxonomy. Feeds existing pipeline.
+Rules+LLM extraction against the §6 taxonomy. Feeds existing pipeline.
 Manual precision review loop: GTM user marks each surfaced hit
 relevant/not in the dashboard, feeding back into extraction-prompt and
 scoring tuning.
@@ -149,7 +191,7 @@ international/private companies that voluntarily publish them (investor
 relations PDFs), subject to a legal check that the source is public and
 scraping is not prohibited by the publishing site's terms.
 
-## 8. Success criteria / how we'll know it's working
+## 9. Success criteria / how we'll know it's working
 
 - Phase 1 ships extraction + scoring covering a pilot set of
   target industries (defined with the GTM user before build) and
@@ -162,13 +204,16 @@ scraping is not prohibited by the publishing site's terms.
 - Zero outreach sent without human approval, consistent with AIGTM's
   existing human-in-the-loop model.
 
-## 9. Open questions for the GTM user before build starts
+## 10. Open questions for the GTM user before build starts
 
 - Target industries/company-size band for the Phase 1 pilot (affects
   EDGAR filer volume and expected hit rate).
 - Whether 8-K M&A items should be in Phase 1 or held for Phase 2 —
   they're higher-signal but noisier to parse than 10-K/10-Q narrative
   sections.
-- Whether a "getting warmer" weak-signal watchlist (§5) is wanted in
+- Whether a "getting warmer" weak-signal watchlist (§6) is wanted in
   v1 dashboard, or if only high-confidence hits should surface at all
   initially.
+- Whether the HubSpot Sync step (§7) should block Phase 1 launch if
+  HubSpot isn't reinstated by then, or ship with Sync deferred and
+  candidates surfaced via Knock-ai/Slack alone in the interim.
