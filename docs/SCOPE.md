@@ -46,6 +46,16 @@ end state; HubSpot-dependent items are marked accordingly.
 - Website visitor de-anonymization (tracking pixel + identity
   resolution provider).
 
+## New source under scoping: IT infrastructure filing scanner
+
+Reddit-based signal sourcing is being retired (unreliable attribution,
+fragile to API/ToS changes). See
+[`PRD-IT-INFRA-SCANNER.md`](PRD-IT-INFRA-SCANNER.md) for the proposed
+replacement: a scanner over SEC filings (10-K/10-Q/8-K) that surfaces
+companies actively starting or managing IT infrastructure projects. It
+plugs into this same pipeline as a new source (`filing-scan`) — no new
+scoring, sync, or outreach mechanism required.
+
 ## Explicit non-goals for now
 
 - No auto-send of outreach email — every send requires human approval
